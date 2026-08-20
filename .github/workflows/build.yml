@@ -5,6 +5,10 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch: {}
 
+defaults:
+  run:
+    working-directory: HideNametag
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,4 +30,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: HideNametag-jar
-          path: target/HideNametag-*.jar
+          path: HideNametag/target/HideNametag-*.jar
