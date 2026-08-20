@@ -2,7 +2,7 @@ name: Build plugin
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "fix/paper-1.21.5", "build-release" ]
   workflow_dispatch: {}
 
 defaults:
