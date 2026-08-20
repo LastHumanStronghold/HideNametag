@@ -1,7 +1,7 @@
 package ru.hidenametag;
 
-import org.bukkit.ChatColor;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -13,9 +13,9 @@ import org.bukkit.scoreboard.NameTagVisibility;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
-public class HideNametagPlugin extends JavaPlugin implements Listener {
+public final class HideNametagPlugin extends JavaPlugin implements Listener {
 
-    private static final String TEAM_NAME = "hn_hidden";
+    private static final String TEAM_NAME = "lhs_hn_hidden";
     private boolean enabled;
 
     @Override
@@ -24,7 +24,6 @@ public class HideNametagPlugin extends JavaPlugin implements Listener {
         enabled = getConfig().getBoolean("hide-nametags", true);
 
         getServer().getPluginManager().registerEvents(this, this);
-
         applyToAll();
 
         getLogger().info("HideNametag включен. Скрытие ников: " + (enabled ? "ВКЛ" : "ВЫКЛ"));
@@ -32,12 +31,7 @@ public class HideNametagPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        // При выключении плагина возвращаем видимость ников по умолчанию
-        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
-        Team team = board.getTeam(TEAM_NAME);
-        if (team != null) {
-            team.unregister();
-        }
+        removeTeam();
     }
 
     @EventHandler
@@ -53,7 +47,12 @@ public class HideNametagPlugin extends JavaPlugin implements Listener {
             return false;
         }
 
-        if (args.length == 0) {
+        if (!sender.hasPermission("hidenametag.admin")) {
+            sender.sendMessage(ChatColor.RED + "У вас нет прав на использование этой команды.");
+            return true;
+        }
+
+        if (args.length != 1) {
             sender.sendMessage(ChatColor.YELLOW + "Использование: /hidenametag <on|off|status>");
             return true;
         }
@@ -86,23 +85,32 @@ public class HideNametagPlugin extends JavaPlugin implements Listener {
             removeTeam();
             return;
         }
-        getOrCreateTeam();
+
+        Team team = getOrCreateTeam();
         for (Player player : Bukkit.getOnlinePlayers()) {
-            addPlayerToTeam(player);
+            if (!team.hasEntry(player.getName())) {
+                team.addEntry(player.getName());
+            }
         }
     }
 
     private Team getOrCreateTeam() {
         Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
         Team team = board.getTeam(TEAM_NAME);
+
         if (team == null) {
             team = board.registerNewTeam(TEAM_NAME);
         }
+
         team.setNameTagVisibility(NameTagVisibility.NEVER);
         return team;
     }
 
     private void addPlayerToTeam(Player player) {
+        if (!enabled) {
+            return;
+        }
+
         Team team = getOrCreateTeam();
         if (!team.hasEntry(player.getName())) {
             team.addEntry(player.getName());
@@ -110,10 +118,26 @@ public class HideNametagPlugin extends JavaPlugin implements Listener {
     }
 
     private void removeTeam() {
-        Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
-        Team team = board.getTeam(TEAM_NAME);
-        if (team != null) {
-            team.unregister();
+        ScoreboardManagerSafe.removeTeam(TEAM_NAME);
+    }
+
+    /**
+     * Keeps scoreboard access in one place and safely handles shutdown/reload.
+     */
+    private static final class ScoreboardManagerSafe {
+        private ScoreboardManagerSafe() {
+        }
+
+        private static void removeTeam(String name) {
+            if (Bukkit.getScoreboardManager() == null) {
+                return;
+            }
+
+            Scoreboard board = Bukkit.getScoreboardManager().getMainScoreboard();
+            Team team = board.getTeam(name);
+            if (team != null) {
+                team.unregister();
+            }
         }
     }
 }
