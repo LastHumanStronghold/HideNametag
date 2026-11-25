@@ -30,7 +30,6 @@ jobs:
           cd work/lhs-cigarettes
           python - <<'PY'
           from pathlib import Path
-          import re
 
           source = Path("src/main/java/com/mainlhs/cigs/client/SmokeLayer.java")
           text = source.read_text(encoding="utf-8")
@@ -46,12 +45,12 @@ jobs:
 
           gradle = Path("build.gradle")
           build = gradle.read_text(encoding="utf-8")
-          build, count = re.subn(r"(?m)^version\\s*=\\s*['\"]1\\.0\\.0['\"]", "version = '1.0.1'", build, count=1)
-          if count != 1:
+          if build.count("version = '1.0.0'") != 1:
               raise SystemExit("Expected exactly one version = '1.0.0' in build.gradle")
+          build = build.replace("version = '1.0.0'", "version = '1.0.1'", 1)
           if "Implementation-Version" not in build:
               build += """
-          
+
           tasks.named('jar', Jar).configure {
               manifest.attributes('Implementation-Version': project.version.toString())
           }
@@ -65,9 +64,9 @@ jobs:
               readme.write_text(data, encoding="utf-8")
 
           changelog = Path("CHANGELOG.md")
-          old_log = changelog.read_text(encoding="utf-8") if changelog.exists() else "# Changelog\\n"
+          old_log = changelog.read_text(encoding="utf-8") if changelog.exists() else "# Changelog\n"
           if "## 1.0.1" not in old_log:
-              old_log = old_log.replace("# Changelog", "# Changelog\\n\\n## 1.0.1\\n- Updated mod version and fixed the Forge 1.20.1 RenderLayer import.\\n", 1)
+              old_log = old_log.replace("# Changelog", "# Changelog\n\n## 1.0.1\n- Updated mod version and fixed the Forge 1.20.1 RenderLayer import.\n", 1)
           changelog.write_text(old_log, encoding="utf-8")
           PY
           chmod +x gradlew
@@ -87,8 +86,8 @@ jobs:
           with ZipFile(jar) as z:
               metadata = z.read("META-INF/mods.toml").decode("utf-8")
               manifest = z.read("META-INF/MANIFEST.MF").decode("utf-8")
-          if 'version="1.0.1"' not in metadata and 'version=\u00221.0.1\u0022' not in metadata:
-              raise SystemExit("Expected mod version 1.0.1 in META-INF/mods.toml; got:\\n" + metadata)
+          if 'version="1.0.1"' not in metadata:
+              raise SystemExit("Expected mod version 1.0.1 in META-INF/mods.toml; got:\n" + metadata)
           if "Implementation-Version: 1.0.1" not in manifest:
               raise SystemExit("Implementation-Version 1.0.1 missing from JAR manifest")
           print("Verified mods.toml and manifest version 1.0.1")
