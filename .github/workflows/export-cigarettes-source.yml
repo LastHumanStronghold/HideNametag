@@ -1,0 +1,23 @@
+name: Export LHS Cigarettes Source
+
+on:
+  push:
+    branches:
+      - temp-export-cigarettes-source
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+      - name: Upload source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: lhs-cigarettes-source
+          path: lhs-cigarettes.zip
+          if-no-files-found: error
+          retention-days: 1
