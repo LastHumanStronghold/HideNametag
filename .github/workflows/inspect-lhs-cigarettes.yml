@@ -29,7 +29,8 @@ jobs:
           right = 'net.minecraft.client.renderer.entity.layers.RenderLayer'
           if wrong in source:
               source = source.replace(wrong, right)
-              smoke_layer.write_text(source, encoding='utf-8')
+          source = source.replace('net.minecraft.client.renderer.entity.layers.RenderLayerParent', 'net.minecraft.client.renderer.entity.RenderLayerParent')
+          smoke_layer.write_text(source, encoding='utf-8')
           elif right not in source:
               raise SystemExit('Could not locate RenderLayer import in SmokeLayer.java')
           import re
