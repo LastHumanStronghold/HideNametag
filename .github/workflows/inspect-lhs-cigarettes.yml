@@ -23,17 +23,23 @@ jobs:
           cd lhs-cigarettes
           python - <<'PY'
           from pathlib import Path
+          import re
+
           smoke_layer = Path('src/main/java/com/mainlhs/cigs/client/SmokeLayer.java')
           source = smoke_layer.read_text(encoding='utf-8')
-          wrong = 'net.minecraft.client.renderer.entity.RenderLayer'
-          right = 'net.minecraft.client.renderer.entity.layers.RenderLayer'
-          if wrong in source:
-              source = source.replace(wrong, right)
-          source = source.replace('net.minecraft.client.renderer.entity.layers.RenderLayerParent', 'net.minecraft.client.renderer.entity.RenderLayerParent')
+          source = source.replace(
+              'import net.minecraft.client.renderer.entity.RenderLayer;',
+              'import net.minecraft.client.renderer.entity.layers.RenderLayer;'
+          )
+          source = source.replace(
+              'import net.minecraft.client.renderer.entity.layers.RenderLayerParent;',
+              'import net.minecraft.client.renderer.entity.RenderLayerParent;'
+          )
+          if 'import net.minecraft.client.renderer.entity.layers.RenderLayer;' not in source:
+              raise SystemExit('RenderLayer import is still incorrect')
+          if 'import net.minecraft.client.renderer.entity.RenderLayerParent;' not in source:
+              raise SystemExit('RenderLayerParent import is still incorrect')
           smoke_layer.write_text(source, encoding='utf-8')
-          elif right not in source:
-              raise SystemExit('Could not locate RenderLayer import in SmokeLayer.java')
-          import re
 
           build = Path("build.gradle")
           text = build.read_text(encoding="utf-8")
