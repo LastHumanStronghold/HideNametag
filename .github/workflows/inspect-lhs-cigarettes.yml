@@ -10,13 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Extract and update mod version
         shell: bash
         run: |
@@ -29,7 +27,7 @@ jobs:
 
           build = Path("build.gradle")
           text = build.read_text(encoding="utf-8")
-          updated, count = re.subn(r"(?m)^version\\s*=\\s*['\"]1\\.0\\.0['\"]", "version = '1.0.1'", text, count=1)
+          updated, count = re.subn(r"""(?m)^version\s*=\s*['"]1\.0\.0['"]""", "version = '1.0.1'", text, count=1)
           if count != 1:
               raise SystemExit("Expected exactly one current version declaration (1.0.0) in build.gradle")
           updated += """
@@ -48,12 +46,13 @@ jobs:
 
           changelog = Path("CHANGELOG.md")
           old_log = changelog.read_text(encoding="utf-8") if changelog.exists() else ""
-          changelog.write_text("## 1.0.1\\n- Updated the mod version and build metadata.\\n\\n" + old_log, encoding="utf-8")
-          PY
+          changelog.write_text("""## 1.0.1
+          - Updated the mod version and build metadata.
 
+          """ + old_log, encoding="utf-8")
+          PY
           chmod +x gradlew
           ./gradlew --no-daemon clean build
-
       - name: Verify JAR and prepare source archive
         shell: bash
         run: |
@@ -80,14 +79,12 @@ jobs:
               print(manifest)
               print("=== MODS.TOML ===")
               print(mods)
-              if not re.search(r"(?mi)^Implementation-Version:\\s*1\\.0\\.1\\s*$", manifest):
+              if not re.search(r"""(?mi)^Implementation-Version:\s*1\.0\.1\s*$""", manifest):
                   raise SystemExit("JAR manifest does not declare version 1.0.1")
-              if 'version="${file.jarVersion}"' not in mods:
-                  if not re.search(r'(?m)^version="1\\.0\\.1"$', mods):
-                      raise SystemExit("Forge mod version placeholder/metadata is unexpected")
+              if 'version="${file.jarVersion}"' not in mods and not re.search(r"""(?m)^version="1\.0\.1"$""", mods):
+                  raise SystemExit("Forge mod version placeholder/metadata is unexpected")
           PY
           (cd lhs-cigarettes && zip -qr ../LHS-Cigarettes-1.0.1-source.zip .)
-
       - name: Upload JAR and updated source
         uses: actions/upload-artifact@v4
         with:
