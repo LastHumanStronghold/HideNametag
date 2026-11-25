@@ -1,4 +1,4 @@
-name: Inspect LHS Cigarettes source archive
+name: Build LHS Cigarettes 1.0.1
 
 on:
   push:
@@ -6,35 +6,92 @@ on:
       - build-lhs-cigarettes-20261125
 
 jobs:
-  inspect:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect source ZIP
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Extract and update mod version
         shell: bash
         run: |
+          set -euo pipefail
+          unzip -q lhs-cigarettes.zip -d .
+          cd lhs-cigarettes
           python - <<'PY'
-          import zipfile, pathlib, hashlib
-          archive = pathlib.Path("lhs-cigarettes.zip")
-          if not archive.exists():
-              raise SystemExit("lhs-cigarettes.zip not found")
-          print("ARCHIVE_SIZE:", archive.stat().st_size)
-          print("ARCHIVE_SHA256:", hashlib.sha256(archive.read_bytes()).hexdigest())
-          with zipfile.ZipFile(archive) as z:
-              infos = [i for i in z.infolist() if not i.is_dir()]
-              print("FILE_COUNT:", len(infos))
-              print("=== FILE TREE ===")
-              for i in infos:
-                  print(f"{i.file_size:>9}  {i.filename}")
-              targets = ("pom.xml", "build.gradle", "build.gradle.kts", "gradle.properties",
-                         "settings.gradle", "settings.gradle.kts", "mods.toml",
-                         "plugin.yml", "fabric.mod.json", "mcmod.info", "README.md")
-              print("=== BUILD / METADATA FILES ===")
-              for i in infos:
-                  if pathlib.PurePosixPath(i.filename).name in targets:
-                      print(f"\\n--- {i.filename} ---")
-                      try:
-                          print(z.read(i).decode("utf-8", "replace")[:20000])
-                      except Exception as e:
-                          print("READ ERROR:", e)
+          from pathlib import Path
+          import re
+
+          build = Path("build.gradle")
+          text = build.read_text(encoding="utf-8")
+          updated, count = re.subn(r"(?m)^version\\s*=\\s*['\"]1\\.0\\.0['\"]", "version = '1.0.1'", text, count=1)
+          if count != 1:
+              raise SystemExit("Expected exactly one current version declaration (1.0.0) in build.gradle")
+          updated += """
+
+          // Keep the mod metadata version available to Forge through the JAR manifest.
+          tasks.named('jar', Jar).configure {
+              manifest.attributes('Implementation-Version': project.version.toString())
+          }
+          """
+          build.write_text(updated, encoding="utf-8")
+
+          readme = Path("README.md")
+          if readme.exists():
+              data = readme.read_text(encoding="utf-8")
+              readme.write_text(data.replace("LHS-Cigarettes-1.0.0.jar", "LHS-Cigarettes-1.0.1.jar"), encoding="utf-8")
+
+          changelog = Path("CHANGELOG.md")
+          old_log = changelog.read_text(encoding="utf-8") if changelog.exists() else ""
+          changelog.write_text("## 1.0.1\\n- Updated the mod version and build metadata.\\n\\n" + old_log, encoding="utf-8")
           PY
+
+          chmod +x gradlew
+          ./gradlew --no-daemon clean build
+
+      - name: Verify JAR and prepare source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import re
+
+          jar = Path("lhs-cigarettes/build/libs/LHS-Cigarettes-1.0.1.jar")
+          if not jar.exists() or jar.stat().st_size < 1000:
+              raise SystemExit("Expected JAR was not produced")
+          with ZipFile(jar) as z:
+              bad = z.testzip()
+              if bad:
+                  raise SystemExit(f"Corrupt JAR entry: {bad}")
+              names = set(z.namelist())
+              required = {"META-INF/MANIFEST.MF", "META-INF/mods.toml"}
+              if not required.issubset(names):
+                  raise SystemExit("JAR is missing Forge metadata")
+              manifest = z.read("META-INF/MANIFEST.MF").decode("utf-8", "replace")
+              mods = z.read("META-INF/mods.toml").decode("utf-8", "replace")
+              print("=== MANIFEST ===")
+              print(manifest)
+              print("=== MODS.TOML ===")
+              print(mods)
+              if not re.search(r"(?mi)^Implementation-Version:\\s*1\\.0\\.1\\s*$", manifest):
+                  raise SystemExit("JAR manifest does not declare version 1.0.1")
+              if 'version="${file.jarVersion}"' not in mods:
+                  if not re.search(r'(?m)^version="1\\.0\\.1"$', mods):
+                      raise SystemExit("Forge mod version placeholder/metadata is unexpected")
+          PY
+          (cd lhs-cigarettes && zip -qr ../LHS-Cigarettes-1.0.1-source.zip .)
+
+      - name: Upload JAR and updated source
+        uses: actions/upload-artifact@v4
+        with:
+          name: LHS-Cigarettes-1.0.1
+          path: |
+            lhs-cigarettes/build/libs/LHS-Cigarettes-1.0.1.jar
+            LHS-Cigarettes-1.0.1-source.zip
