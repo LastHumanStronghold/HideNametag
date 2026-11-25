@@ -1,0 +1,40 @@
+name: Inspect LHS Cigarettes source archive
+
+on:
+  push:
+    branches:
+      - build-lhs-cigarettes-20261125
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect source ZIP
+        shell: bash
+        run: |
+          python - <<'PY'
+          import zipfile, pathlib, hashlib
+          archive = pathlib.Path("lhs-cigarettes.zip")
+          if not archive.exists():
+              raise SystemExit("lhs-cigarettes.zip not found")
+          print("ARCHIVE_SIZE:", archive.stat().st_size)
+          print("ARCHIVE_SHA256:", hashlib.sha256(archive.read_bytes()).hexdigest())
+          with zipfile.ZipFile(archive) as z:
+              infos = [i for i in z.infolist() if not i.is_dir()]
+              print("FILE_COUNT:", len(infos))
+              print("=== FILE TREE ===")
+              for i in infos:
+                  print(f"{i.file_size:>9}  {i.filename}")
+              targets = ("pom.xml", "build.gradle", "build.gradle.kts", "gradle.properties",
+                         "settings.gradle", "settings.gradle.kts", "mods.toml",
+                         "plugin.yml", "fabric.mod.json", "mcmod.info", "README.md")
+              print("=== BUILD / METADATA FILES ===")
+              for i in infos:
+                  if pathlib.PurePosixPath(i.filename).name in targets:
+                      print(f"\\n--- {i.filename} ---")
+                      try:
+                          print(z.read(i).decode("utf-8", "replace")[:20000])
+                      except Exception as e:
+                          print("READ ERROR:", e)
+          PY
