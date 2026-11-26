@@ -1,0 +1,110 @@
+name: Build HDSkinsMod 1.1.1
+
+on:
+  push:
+    branches:
+      - build-hdskins-1-1-1-20261126
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Extract source and update version
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work/hdskins
+          unzip -q HDSkinsMod-source.zip -d work/hdskins
+          cd work/hdskins
+          python - <<'PY'
+          from pathlib import Path
+
+          build = Path("build.gradle")
+          data = build.read_text(encoding="utf-8")
+          if data.count("version = '1.1.0'") != 1:
+              raise SystemExit("Expected exactly one current version declaration: 1.1.0")
+          build.write_text(data.replace("version = '1.1.0'", "version = '1.1.1'", 1), encoding="utf-8")
+
+          readme = Path("README.md")
+          if readme.exists():
+              text = readme.read_text(encoding="utf-8")
+              text = text.replace("hdskins-1.1.0.jar", "hdskins-1.1.1.jar")
+              text = text.replace("hdskins-1.1.0", "hdskins-1.1.1")
+              readme.write_text(text, encoding="utf-8")
+
+          changelog = Path("CHANGELOG.md")
+          old = changelog.read_text(encoding="utf-8") if changelog.exists() else "# История изменений\n"
+          if "## 1.1.1" not in old:
+              old = old.replace(
+                  "# История изменений",
+                  "# История изменений\n\n## 1.1.1\n- Обновлена версия мода до 1.1.1.\n",
+                  1
+              )
+          changelog.write_text(old, encoding="utf-8")
+          PY
+          chmod +x gradlew
+          ./gradlew --no-daemon clean build
+
+      - name: Verify JAR and prepare updated source
+        shell: bash
+        run: |
+          set -euo pipefail
+          JAR="work/hdskins/build/libs/hdskins-1.1.1.jar"
+          test -s "$JAR"
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import re
+
+          jar = Path("work/hdskins/build/libs/hdskins-1.1.1.jar")
+          with ZipFile(jar) as z:
+              bad = z.testzip()
+              if bad:
+                  raise SystemExit(f"Corrupt JAR entry: {bad}")
+              names = set(z.namelist())
+              required = {"hdskins.refmap.json", "hdskins.mixins.json", "META-INF/mods.toml"}
+              missing = sorted(required - names)
+              if missing:
+                  raise SystemExit("Missing required entries: " + ", ".join(missing))
+              mods = z.read("META-INF/mods.toml").decode("utf-8", "replace")
+              manifest = z.read("META-INF/MANIFEST.MF").decode("utf-8", "replace")
+              print("=== mods.toml ===")
+              print(mods)
+              print("=== manifest ===")
+              print(manifest)
+              if not re.search(r'(?m)^version="1\\.1\\.1"$', mods):
+                  raise SystemExit("Forge metadata does not contain version 1.1.1")
+              if not re.search(r'(?m)^Implementation-Version: 1\\.1\\.1$', manifest):
+                  raise SystemExit("Manifest does not contain Implementation-Version 1.1.1")
+              print("JAR integrity and required HDSkins mixin resources verified.")
+          PY
+          (cd work/hdskins && zip -qr ../../HDSkinsMod-1.1.1-source.zip .)
+          sha256sum "$JAR"
+
+      - name: Upload compiled JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: HDSkinsMod-1.1.1-JAR
+          path: work/hdskins/build/libs/hdskins-1.1.1.jar
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload updated source
+        uses: actions/upload-artifact@v4
+        with:
+          name: HDSkinsMod-1.1.1-Source
+          path: HDSkinsMod-1.1.1-source.zip
+          if-no-files-found: error
+          retention-days: 7
