@@ -84,7 +84,7 @@ jobs:
               if expected_placeholder not in mods:
                   raise SystemExit("Forge mods.toml version placeholder is missing or changed unexpectedly")
               if "Implementation-Version: 1.1.1" not in manifest.splitlines():
-              raise SystemExit("Manifest does not contain Implementation-Version 1.1.1")
+                  raise SystemExit("Manifest does not contain Implementation-Version 1.1.1")
               print("Verified Forge version placeholder, manifest version 1.1.1, HDSkins mixin resources and JAR integrity.")
           PY
           (cd work/hdskins && zip -qr ../../HDSkinsMod-1.1.1-source.zip .)
