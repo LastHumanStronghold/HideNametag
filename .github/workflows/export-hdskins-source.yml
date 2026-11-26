@@ -1,0 +1,19 @@
+name: Export HDSkinsMod Source
+on:
+  push:
+    branches:
+      - temp-hdskins-source-export-20261126
+permissions:
+  contents: read
+jobs:
+  export-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: HDSkinsMod-source-inspection
+          path: HDSkinsMod-source.zip
+          if-no-files-found: error
+          retention-days: 1
