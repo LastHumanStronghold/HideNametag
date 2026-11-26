@@ -80,15 +80,12 @@ jobs:
                   raise SystemExit("Missing required entries: " + ", ".join(missing))
               mods = z.read("META-INF/mods.toml").decode("utf-8", "replace")
               manifest = z.read("META-INF/MANIFEST.MF").decode("utf-8", "replace")
-              print("=== mods.toml ===")
-              print(mods)
-              print("=== manifest ===")
-              print(manifest)
-              if not re.search(r'(?m)^version="1\\.1\\.1"$', mods):
-                  raise SystemExit("Forge metadata does not contain version 1.1.1")
-              if not re.search(r'(?m)^Implementation-Version: 1\\.1\\.1$', manifest):
+              expected_placeholder = 'version="' + '$' + '{file.jarVersion}"'
+              if expected_placeholder not in mods:
+                  raise SystemExit("Forge mods.toml version placeholder is missing or changed unexpectedly")
+              if not re.search(r'(?m)^Implementation-Version: 1\.1\.1$', manifest):
                   raise SystemExit("Manifest does not contain Implementation-Version 1.1.1")
-              print("JAR integrity and required HDSkins mixin resources verified.")
+              print("Verified Forge version placeholder, manifest version 1.1.1, HDSkins mixin resources and JAR integrity.")
           PY
           (cd work/hdskins && zip -qr ../../HDSkinsMod-1.1.1-source.zip .)
           sha256sum "$JAR"
